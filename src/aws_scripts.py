@@ -192,3 +192,63 @@ def get_voice_id_by_voice_name(voice_name):
             voice_id = cursor.fetchone()[0]
     return voice_id
 
+
+def get_all_voice_categories():
+    with connect_to_db() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT DISTINCT category FROM voices
+            """)
+            categories = cursor.fetchall()
+    return categories
+
+
+def get_all_accents_from_labels():
+    with connect_to_db() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT DISTINCT labels->>'accent' FROM voices
+            """)
+            accents = cursor.fetchall()
+    return accents
+
+
+def get_all_ages_from_labels():
+    with connect_to_db() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT DISTINCT labels->>'age' FROM voices
+            """)
+            ages = cursor.fetchall()
+    return ages
+
+
+def get_all_genders_from_labels():
+    with connect_to_db() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT DISTINCT labels->>'gender' FROM voices
+            """)
+            genders = cursor.fetchall()
+    return genders
+
+
+def get_all_use_cases_from_labels():
+    with connect_to_db() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT DISTINCT labels->>'use_case' FROM voices
+            """)
+            use_cases = cursor.fetchall()
+    return use_cases
+
+
+def get_all_voices_for_category(category):
+    with connect_to_db() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT voice_id, name, labels FROM voices WHERE category = %s
+            """, (category,))
+            voices = cursor.fetchall()
+    return voices
+

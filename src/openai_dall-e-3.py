@@ -1,4 +1,6 @@
 # Bring in deps
+import os
+
 import streamlit
 import streamlit as st
 from PIL import Image, ImageDraw, ImageFont
@@ -10,9 +12,10 @@ from prompt_templates import prompt_templates
 from aws_scripts import (store_story_metadata, store_segment_metadata,
                          get_stories, get_story_segments_and_image_urls, download_image,
                          download_audio, delete_s3_objects, delete_story)
-from aws_scripts import prepare_aws_environment
+from aws_scripts import prepare_aws_environment, get_all_voices_for_category, get_all_voice_categories, store_voice_metadata
 from story_creating_utils import check_characters, generate_dall_e_3_gpt_dict
 from process_media import process_image, process_audio, process_audio_wrapper, process_image_wrapper
+from ai_model_apis import clone_voice
 
 # Define constants
 BUCKET_NAME = "narraitive"
@@ -91,10 +94,23 @@ def main():
         st.warning('Please enter your OpenAI API key!', icon='⚠')
     else:
         st.success('API key is valid ✅')
+        elevenlabs_api_key = os.getenv("ELEVENLABS_API_KEY")
         openai.api_key = openai_api_key
         topic = st.text_input("What should the story be about?", placeholder="Story topic")
         # get the age from a streamlit selectbox widget
         children_age = st.selectbox("What is the age of the children?", ["1-2", "3-5", "6-8", "9-11"])
+        # get the voice from a streamlit selectbox widget
+        voice_category = st.selectbox("What is the voice category?", get_all_voice_categories())
+        voices = get_all_voices_for_category(voice_category)
+        selected_voice = st.selectbox("What is the voice?", voices)
+        if st.button("Clone own voice!"):
+            files = st.file_uploader("Upload at least 5 voice samples!", type=['m4a', 'mp3', 'wav'], accept_multiple_files=True)
+            # save files locally and then to s3
+            # files_path = ...
+            # text_input for name, labels, description
+            cloned_voice = clone_voice(elevenlabs_api_key, files, voice_category)
+            store_voice_metadata(cloned_voice.name, cloned_voice.voice_id, cloned_voice.category, files_paths, cloned_voice.labels)
+            selected_voice = cloned_voice.name
         templates_prompt = prompt_templates(topic, children_age)
         parallel_execution = st.sidebar.checkbox("Create images and audio in parallel", False, key="parallel")
         # streamlit widget to save the settings and start generating the story
@@ -158,7 +174,7 @@ def main():
                         process_audio_args.append({'openai_api_key': openai_api_key, 'segment_content': segment_content, 'i_seg': i_seg, 'story_id': story_id, 'segment_id': segment_id, 's3_client': s3_client})
                     else:
                         with st.spinner("Generating audio..."):
-                            process_audio(openai_api_key, segment_content, i_seg, story_id, segment_id, s3_client, bucket_name=BUCKET_NAME)
+                            process_audio(openai_api_key, segment_content, i_seg, story_id, segment_id, s3_client, bucket_name=BUCKET_NAME, model="eleven_multilingual_v2", voice=selected_voice)
                             api_audio_costs += 0.0
                     # append audio path to dict
                     st.session_state.dict_dall_e_3_gpt["segments"][i_seg]["audio_path"] = f"audio/output_{i_seg}.mp3"
