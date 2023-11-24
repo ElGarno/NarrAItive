@@ -100,14 +100,18 @@ def get_description_from_image(api_key,
     return response.json()["choices"][0]['message']['content']
 
 
-def clone_voice(api_key, files, name):
+def clone_voice(api_key, files, name, description="", labels=None):
     """
     Clone a voice from files.
     """
+    if labels is None:
+        labels = {}
     set_api_key(api_key)
     voice = clone(
         name=name,
-        files=files
+        files=files,
+        description=description,
+        labels=labels
     )
     return voice
 

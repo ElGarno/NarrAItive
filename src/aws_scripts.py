@@ -4,6 +4,7 @@ from creds_db import DBConfig
 from creds_aws import AWSConfig
 import streamlit as st
 import boto3
+import json
 
 
 REGION = "eu-central-1"
@@ -168,4 +169,15 @@ def store_audio_metadata(url, audio_id, segment_id, model, voice):
                 INSERT INTO audios (audio_id, segment_id, url, creation_timestamp, creation_model, voice) 
                 VALUES (%s, %s, %s, %s, %s, %s)
             """, (audio_id, segment_id, url, creation_time, model, voice))
+            conn.commit()
+
+
+def store_voice_metadata(name, voice_id, category, training_files, labels):
+    creation_time = datetime.now()
+    with connect_to_db() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                INSERT INTO voices (name, voice_id, category, training_files, labels, creation_datetime) 
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (name, voice_id, category, training_files, json.dumps(labels), creation_time))
             conn.commit()
