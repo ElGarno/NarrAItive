@@ -30,7 +30,7 @@ def get_audio_from_text_and_save_to_file(api_key,
     client = openai.OpenAI(api_key=api_key)
     response = client.audio.speech.create(
         model=model,
-        voice="alloy",
+        voice=voice,
         input=text
     )
     response.stream_to_file(speech_file_path)
@@ -112,11 +112,20 @@ def clone_voice(api_key, files, name):
     return voice
 
 
-def generate_audio_voice_id(api_key, voice_id, text, file_path, model_id="eleven_multilingual_v2",
+def get_voice_id_by_name(voices_response, name):
+    return [voice["voice_id"] for voice in voices_response["voices"] if voice["name"] == name][0]
+
+
+def generate_audio_voice_id(api_key, voice_name, text, file_path, model_id="eleven_multilingual_v2",
                             stability=0.5, similarity_boost=0.5):
     """
     Generate audio from a voice and a text.
     """
+
+    # get voice_id by voice name
+    voices = get_voices(api_key)
+    voice_id = get_voice_id_by_name(voices, voice_name)
+
     url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
 
     headers = {

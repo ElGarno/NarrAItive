@@ -1,6 +1,6 @@
 import uuid
 from aws_scripts import upload_image_to_s3, upload_audio_to_s3, store_image_metadata, store_audio_metadata
-from ai_model_apis import get_image_from_prompt, get_audio_from_text_and_save_to_file
+from ai_model_apis import get_image_from_prompt, get_audio_from_text_and_save_to_file, generate_audio_voice_id
 import requests
 
 
@@ -16,12 +16,17 @@ def process_image(openai_api_key, image_prompt, i_seg, story_id, segment_id, s3_
     store_image_metadata(aws_url, image_id, segment_id, "dall_e_3_gpt", "1024x1024")
 
 
-def process_audio(openai_api_key, segment_content, i_seg, story_id, segment_id, s3_client, bucket_name):
-    get_audio_from_text_and_save_to_file(api_key=openai_api_key,
-                                         text=segment_content,
-                                         speech_file_path=f"audio/output_{i_seg}.mp3",
-                                         model="tts-1",
-                                         voice="alloy")
+def process_audio(api_key, segment_content, i_seg, story_id, segment_id, s3_client, bucket_name, model, voice,
+                  stability=0.5, similarity_boost=0.5):
+    if model == "tts-1":
+        get_audio_from_text_and_save_to_file(api_key=api_key,
+                                             text=segment_content,
+                                             speech_file_path=f"audio/output_{i_seg}.mp3",
+                                             model=model,
+                                             voice=voice)
+    else:
+        generate_audio_voice_id(api_key, voice, segment_content, f"audio/output_{i_seg}.mp3", model_id=model,
+                                stability=0.5, similarity_boost=0.5)
     audio_id = str(uuid.uuid4())
     # upload audio to aws s3 bucket
     aws_audio_url = upload_audio_to_s3(s3_cl=s3_client, bucket_name=bucket_name, file_path=f"audio/output_{i_seg}.mp3", story_id=story_id, audio_id=audio_id)
