@@ -2,6 +2,10 @@ import requests
 import boto3
 import base64
 import openai
+from elevenlabs import clone, generate
+from elevenlabs import set_api_key
+
+CHUNK_SIZE = 1024
 
 
 def get_completion_from_messages(api_key,
@@ -95,3 +99,45 @@ def get_description_from_image(api_key,
         if response.status_code == 200:
             break
     return response.json()["choices"][0]['message']['content']
+
+
+def clone_voice(api_key, files, name):
+    """
+    Clone a voice from files.
+    """
+    set_api_key(api_key)
+    voice = clone(
+        name=name,
+        files=files
+    )
+    return voice
+
+
+def generate_audio_voice_id(api_key, voice_id, text, file_path, model_id="eleven_multilingual_v2",
+                            stability=0.5, similarity_boost=0.5):
+    """
+    Generate audio from a voice and a text.
+    """
+
+    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+
+    headers = {
+        "Accept": "audio/mpeg",
+        "Content-Type": "application/json",
+        "xi-api-key": api_key
+    }
+
+    data = {
+        "text": text,
+        "model_id": model_id,
+        "voice_settings": {
+            "stability": stability,
+            "similarity_boost": similarity_boost
+        }
+    }
+
+    response = requests.post(url, json=data, headers=headers)
+    with open(file_path, 'wb') as f:
+        for chunk in response.iter_content(chunk_size=CHUNK_SIZE):
+            if chunk:
+                f.write(chunk)
