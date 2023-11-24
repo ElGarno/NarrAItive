@@ -1,8 +1,7 @@
 import requests
-import boto3
 import base64
 import openai
-from elevenlabs import clone, generate
+from elevenlabs import clone
 from elevenlabs import set_api_key
 
 CHUNK_SIZE = 1024
@@ -118,7 +117,6 @@ def generate_audio_voice_id(api_key, voice_id, text, file_path, model_id="eleven
     """
     Generate audio from a voice and a text.
     """
-
     url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
 
     headers = {
@@ -141,3 +139,10 @@ def generate_audio_voice_id(api_key, voice_id, text, file_path, model_id="eleven
         for chunk in response.iter_content(chunk_size=CHUNK_SIZE):
             if chunk:
                 f.write(chunk)
+
+
+def get_voices(api_key):
+    set_api_key(api_key)
+    url = "https://api.elevenlabs.io/v1/voices"
+    response = requests.request("GET", url)
+    return response.json()
