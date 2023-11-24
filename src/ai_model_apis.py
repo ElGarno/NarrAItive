@@ -3,6 +3,7 @@ import base64
 import openai
 from elevenlabs import clone
 from elevenlabs import set_api_key
+from aws_scripts import get_voice_id_by_voice_name
 
 CHUNK_SIZE = 1024
 
@@ -127,8 +128,7 @@ def generate_audio_voice_id(api_key, voice_name, text, file_path, model_id="elev
     """
 
     # get voice_id by voice name
-    voices = get_voices(api_key)
-    voice_id = get_voice_id_by_name(voices, voice_name)
+    voice_id = get_voice_id_by_voice_name(voice_name)
 
     url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
 

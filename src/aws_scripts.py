@@ -181,3 +181,14 @@ def store_voice_metadata(name, voice_id, category, training_files, labels):
                 VALUES (%s, %s, %s, %s, %s, %s)
             """, (name, voice_id, category, training_files, json.dumps(labels), creation_time))
             conn.commit()
+
+
+def get_voice_id_by_voice_name(voice_name):
+    with connect_to_db() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT voice_id FROM voices WHERE name = %s
+            """, (voice_name,))
+            voice_id = cursor.fetchone()[0]
+    return voice_id
+
