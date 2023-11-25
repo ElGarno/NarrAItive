@@ -5,6 +5,7 @@ from creds_aws import AWSConfig
 import streamlit as st
 import boto3
 import json
+import os
 
 
 REGION = "eu-central-1"
@@ -22,6 +23,32 @@ def prepare_aws_environment():
     client = initialize_s3_client(AWSConfig.AWS_ACCESS_KEY, AWSConfig.AWS_SECRET_KEY)
     # Ensure the table exists
     return client
+
+
+def upload_file_to_s3(s3_cl, file, bucket_name, object_name):
+    try:
+        s3_cl.upload_file(file, bucket_name, object_name)
+        # Construct the S3 URL
+        url = f"https://{bucket_name}.s3.amazonaws.com/{object_name}"
+        return url
+    except Exception as e:
+        st.error(f"An error occurred: {e}")
+        return False
+
+
+def save_file_locally(uploaded_file, save_path):
+    # Create the directory if it doesn't exist
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+
+    # Define the full file path
+    file_path = os.path.join(save_path, uploaded_file.name)
+
+    # Write the file to the specified directory
+    with open(file_path, "wb") as f:
+        f.write(uploaded_file.getbuffer())
+
+    return file_path
 
 
 def upload_image_to_s3(s3_cl, bucket_name, file_path, story_id, image_id):

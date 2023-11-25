@@ -11,7 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 from prompt_templates import prompt_templates
 from aws_scripts import (store_story_metadata, store_segment_metadata,
                          get_stories, get_story_segments_and_image_urls, download_image,
-                         download_audio, delete_s3_objects, delete_story)
+                         download_audio, delete_s3_objects, delete_story, upload_file_to_s3, save_file_locally)
 from aws_scripts import prepare_aws_environment, get_all_voices_for_category, get_all_voice_categories, store_voice_metadata
 from story_creating_utils import check_characters, generate_dall_e_3_gpt_dict
 from process_media import process_image, process_audio, process_audio_wrapper, process_image_wrapper
@@ -101,15 +101,30 @@ def main():
         children_age = st.selectbox("What is the age of the children?", ["1-2", "3-5", "6-8", "9-11"])
         # get the voice from a streamlit selectbox widget
         voice_category = st.selectbox("What is the voice category?", get_all_voice_categories())
-        voices = get_all_voices_for_category(voice_category)
+        voices = get_all_voices_for_category(voice_category)[1]
         selected_voice = st.selectbox("What is the voice?", voices)
+        local_voice_save_path = "voice_input"
+        local_voice_file_paths = []
+        cloud_voice_file_paths = []
         if st.button("Clone own voice!"):
-            files = st.file_uploader("Upload at least 5 voice samples!", type=['m4a', 'mp3', 'wav'], accept_multiple_files=True)
-            # save files locally and then to s3
-            # files_path = ...
-            # text_input for name, labels, description
-            cloned_voice = clone_voice(elevenlabs_api_key, files, voice_category)
-            store_voice_metadata(cloned_voice.name, cloned_voice.voice_id, cloned_voice.category, files_paths, cloned_voice.labels)
+            uploaded_files = st.file_uploader("Upload at least 5 voice samples!", type=['m4a', 'mp3', 'wav'], accept_multiple_files=True)
+            if uploaded_files is not None:
+                for uploaded_file in uploaded_files:
+                    local_voice_file_path = save_file_locally(uploaded_file, local_voice_save_path)
+                    st.write(f"Saved locally at: {local_voice_file_path}")
+                    local_voice_file_paths.append(local_voice_file_path)
+                    # Define the S3 object name (key)
+                    s3_object_name = f"voices/{uploaded_file.name}"
+                    # Upload the file
+                    voice_url = upload_file_to_s3(s3_client, uploaded_file, BUCKET_NAME, s3_object_name)
+                    cloud_voice_file_paths.append(voice_url)
+
+            # input fields for name, description and labels: (age, accent, gender, use_case, description)
+            inp_voice_name = st.text_input("Name of the voice", "My voice")
+            inp_voice_descr = st.text_input("Description of the voice", "Description here like 'calm, friendly, ...'")
+            inp_voice_labels = st.text_input("Enter labels", {'age': 'young', 'accent': 'german', 'gender': 'male', 'use-case': 'narration'})
+            cloned_voice = clone_voice(elevenlabs_api_key, local_voice_file_paths, inp_voice_name, inp_voice_descr, inp_voice_labels)
+            store_voice_metadata(cloned_voice.name, cloned_voice.voice_id, cloned_voice.category, cloud_voice_file_paths, cloned_voice.labels)
             selected_voice = cloned_voice.name
         templates_prompt = prompt_templates(topic, children_age)
         parallel_execution = st.sidebar.checkbox("Create images and audio in parallel", False, key="parallel")
