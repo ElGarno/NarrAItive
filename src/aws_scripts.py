@@ -226,7 +226,7 @@ def get_all_voice_categories():
             cursor.execute("""
                 SELECT DISTINCT category FROM voices
             """)
-            categories = cursor.fetchall()
+            categories = [row[0] for row in cursor.fetchall()]
     return categories
 
 

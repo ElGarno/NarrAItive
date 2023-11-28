@@ -31,7 +31,7 @@ def process_audio(api_key, segment_content, i_seg, story_id, segment_id, s3_clie
     # upload audio to aws s3 bucket
     aws_audio_url = upload_audio_to_s3(s3_cl=s3_client, bucket_name=bucket_name, file_path=f"audio/output_{i_seg}.mp3", story_id=story_id, audio_id=audio_id)
     # store audio metadata in postgresql
-    store_audio_metadata(url=aws_audio_url, audio_id=audio_id, segment_id=segment_id, model="tts-1", voice="alloy")
+    store_audio_metadata(url=aws_audio_url, audio_id=audio_id, segment_id=segment_id, model=model, voice=voice)
 
 
 def write_image_from_url_to_file(url, file_path, image_id):

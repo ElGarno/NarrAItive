@@ -105,6 +105,8 @@ def main():
         voice_category = st.selectbox("What is the voice category?", get_all_voice_categories())
         voices = get_all_voices_for_category(voice_category)
         selected_voice = st.selectbox("What is the voice?", voices)
+        # only take the name of the voice, so the second value of selected_voice
+        selected_voice = selected_voice[1]
         local_voice_save_path = "voice_input"
         local_voice_file_paths = []
         cloud_voice_file_paths = []
