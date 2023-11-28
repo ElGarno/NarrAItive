@@ -129,6 +129,8 @@ def generate_audio_voice_id(api_key, voice_name, text, file_path, model_id="elev
 
     # get voice_id by voice name
     voice_id = get_voice_id_by_voice_name(voice_name)
+    # voice_id = voice_id[0]
+    print(f"voice_id: {voice_id}, file_path: {file_path}, text: {text}")
 
     url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
 

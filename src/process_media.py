@@ -26,7 +26,7 @@ def process_audio(api_key, segment_content, i_seg, story_id, segment_id, s3_clie
                                              voice=voice)
     else:
         generate_audio_voice_id(api_key, voice, segment_content, f"audio/output_{i_seg}.mp3", model_id=model,
-                                stability=0.5, similarity_boost=0.5)
+                                stability=stability, similarity_boost=similarity_boost)
     audio_id = str(uuid.uuid4())
     # upload audio to aws s3 bucket
     aws_audio_url = upload_audio_to_s3(s3_cl=s3_client, bucket_name=bucket_name, file_path=f"audio/output_{i_seg}.mp3", story_id=story_id, audio_id=audio_id)

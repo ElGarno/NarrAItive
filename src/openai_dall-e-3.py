@@ -195,7 +195,7 @@ def main():
                         process_audio_args.append({'openai_api_key': openai_api_key, 'segment_content': segment_content, 'i_seg': i_seg, 'story_id': story_id, 'segment_id': segment_id, 's3_client': s3_client})
                     else:
                         with st.spinner("Generating audio..."):
-                            process_audio(openai_api_key, segment_content, i_seg, story_id, segment_id, s3_client, bucket_name=BUCKET_NAME, model="eleven_multilingual_v2", voice=selected_voice)
+                            process_audio(elevenlabs_api_key, segment_content, i_seg, story_id, segment_id, s3_client, bucket_name=BUCKET_NAME, model="eleven_multilingual_v2", voice=selected_voice)
                             api_audio_costs += 0.0
                     # append audio path to dict
                     st.session_state.dict_dall_e_3_gpt["segments"][i_seg]["audio_path"] = f"audio/output_{i_seg}.mp3"
