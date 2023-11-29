@@ -121,16 +121,16 @@ def get_voice_id_by_name(voices_response, name):
     return [voice["voice_id"] for voice in voices_response["voices"] if voice["name"] == name][0]
 
 
-def generate_audio_voice_id(api_key, voice_name, text, file_path, model_id="eleven_multilingual_v2",
+def generate_audio_voice_id(api_key, voice_id, text, file_path, model_id="eleven_multilingual_v2",
                             stability=0.5, similarity_boost=0.5):
     """
     Generate audio from a voice and a text.
     """
 
     # get voice_id by voice name
-    voice_id = get_voice_id_by_voice_name(voice_name)
-    # voice_id = voice_id[0]
-    print(f"voice_id: {voice_id}, file_path: {file_path}, text: {text}")
+    # voice_id = get_voice_id_by_voice_name(voice_name)
+    # voice_id = voice_name
+    # print(f"voice_id: {voice_id}, file_path: {file_path}, text: {text}")
 
     url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
 

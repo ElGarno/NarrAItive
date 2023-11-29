@@ -23,7 +23,7 @@ def check_characters(templates_prompt, openapi_key, messages):
                 if uploaded_image_character[character_name] is not None:
                     save_avatar_img_locally(f"img/{character_name}.png", uploaded_image_character[character_name])
                     dict_characters_response["characters"][i_character]["description"] = get_description_from_image(openapi_key, f"img/{character_name}.png", model="gpt-4-vision-preview")
-                    print(dict_characters_response["characters"][i_character]["description"])
+                    # print(dict_characters_response["characters"][i_character]["description"])
             else:
                 dict_characters_response["characters"][i_character]["description"] = st.text_input(
                     f"Please describe the character {character_name} in more detail.")

@@ -105,8 +105,8 @@ def main():
         voice_category = st.selectbox("What is the voice category?", get_all_voice_categories())
         voices = get_all_voices_for_category(voice_category)
         selected_voice = st.selectbox("What is the voice?", voices)
-        # only take the name of the voice, so the second value of selected_voice
-        selected_voice = selected_voice[1]
+        # only take the id of the voice, so the first value of selected_voice
+        selected_voice = selected_voice[0]
         local_voice_save_path = "voice_input"
         local_voice_file_paths = []
         cloud_voice_file_paths = []
@@ -115,7 +115,6 @@ def main():
         if st.session_state.stage == 1:
             st.session_state.voice_inputs = st.file_uploader("Upload at least 5 voice samples!", type=['m4a'], accept_multiple_files=True)
             if st.session_state.voice_inputs:
-                print(st.session_state.voice_inputs)
                 for uploaded_file in st.session_state.voice_inputs:
                     local_voice_file_path = save_file_locally(uploaded_file, local_voice_save_path)
                     st.write(f"Saved locally at: {local_voice_file_path}")
@@ -126,12 +125,30 @@ def main():
                     voice_url = upload_file_to_s3(s3_client, local_voice_file_path, BUCKET_NAME, s3_object_name)
                     cloud_voice_file_paths.append(voice_url)
                 # input fields for name, description and labels: (age, accent, gender, use_case, description)
-                inp_voice_name = st.text_input("Name of the voice", "My voice")
-                inp_voice_descr = st.text_input("Description of the voice", "Description here like 'calm, friendly, ...'")
-                inp_voice_labels = json.loads(st.text_input("Enter labels", '{"age": "young", "accent": "german", "gender": "male", "use-case": "narration"}'))
-                cloned_voice = clone_voice(elevenlabs_api_key, local_voice_file_paths, inp_voice_name, inp_voice_descr, inp_voice_labels)
-                store_voice_metadata(cloned_voice.name, cloned_voice.voice_id, cloned_voice.category, cloud_voice_file_paths, cloned_voice.labels)
-                selected_voice = cloned_voice.name
+                # Using Streamlit's form feature to group inputs together
+                with st.form(key='voice_form'):
+                    inp_voice_name = st.text_input("Name of the voice", "My voice")
+                    inp_voice_descr = st.text_input("Description of the voice", "Description here like 'calm, friendly, ...'")
+                    try:
+                        inp_voice_labels = json.loads(st.text_input("Enter labels", '{"age": "young", "accent": "german", "gender": "male", "use-case": "narration"}'))
+                    except json.JSONDecodeError:
+                        st.error("Labels must be in valid JSON format.")
+                        inp_voice_labels = {}
+
+                    submit_button = st.form_submit_button("Confirm")
+
+                # Check if the form is submitted and all fields are filled out
+                if submit_button:
+                    if inp_voice_name != "My voice" and inp_voice_descr != "Description here like 'calm, friendly, ...'" and inp_voice_labels:
+                        # Proceed with processing the data
+                        st.success("Form submitted successfully!")
+                        # You can add your logic here to handle the form data
+                        cloned_voice = clone_voice(elevenlabs_api_key, local_voice_file_paths, inp_voice_name, inp_voice_descr, inp_voice_labels)
+                        store_voice_metadata(cloned_voice.name, cloned_voice.voice_id, cloned_voice.category, cloud_voice_file_paths, cloned_voice.labels)
+                        selected_voice = cloned_voice.name
+                    else:
+                        # Show an error message
+                        st.warning("Please fill out all fields with valid information.")
         templates_prompt = prompt_templates(topic, children_age)
         parallel_execution = st.sidebar.checkbox("Create images and audio in parallel", False, key="parallel")
         # streamlit widget to save the settings and start generating the story
