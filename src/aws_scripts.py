@@ -81,6 +81,11 @@ def delete_s3_objects(s3_cl, bucket_name, prefix):
         st.info(f"Deleted {response['KeyCount']} objects from S3")
 
 
+def delete_single_objects_from_s3(s3_cl, bucket_name, object_name):
+    s3_cl.delete_object(Bucket=bucket_name, Key=object_name)
+    st.info(f"Deleted {object_name} from S3")
+
+
 def download_image(s3_cl, bucket_name, story_id, image_id, local_file_path):
     # Download the image from S3 and save it to the local file system
     object_name = f"{story_id}/{image_id}.jpg"

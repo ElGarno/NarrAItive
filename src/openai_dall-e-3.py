@@ -55,6 +55,8 @@ def main():
         st.session_state.dict_characters = {}
     if 'dict_openai_api_costs' not in st.session_state:
         st.session_state.dict_openai_api_costs = {}
+    if 'story_id' not in st.session_state:
+        st.session_state.story_id = ""
 
     # stories[0] = story_id, stories[1] = story_title
     stories = get_stories()
@@ -66,7 +68,8 @@ def main():
     apply_button = st.sidebar.button('Load Story')
     delete_button = st.sidebar.button('Delete Story')
     if apply_button:
-        segments = get_story_segments_and_image_urls(story_selectbox[0])
+        st.session_state.story_id = story_selectbox[0]
+        segments = get_story_segments_and_image_urls(st.session_state.story_id)
         # print(segments)
         st.session_state.stage = 3
         # fill dict with segments
@@ -83,7 +86,7 @@ def main():
             })
         for i_segment in range(len(st.session_state.dict_dall_e_3_gpt["segments"])):
             loc_file_path = f"img/output_{i_segment}.png"
-            download_image(s3_client, BUCKET_NAME, story_selectbox[0], st.session_state.dict_dall_e_3_gpt["segments"][i_segment]["image_id"], loc_file_path)
+            download_image(s3_client, BUCKET_NAME, st.session_state.story_id, st.session_state.dict_dall_e_3_gpt["segments"][i_segment]["image_id"], loc_file_path)
             st.session_state.dict_dall_e_3_gpt["segments"][i_segment]["image_path"] = f"img/output_{i_segment}.png"
             loc_file_path_audio = f"audio/output_{i_segment}.mp3"
             download_audio(s3_client, BUCKET_NAME, story_selectbox[0], st.session_state.dict_dall_e_3_gpt["segments"][i_segment]["audio_id"], loc_file_path_audio)
@@ -255,6 +258,13 @@ def main():
             # Display the caption with customized font size
             # st.markdown(f'<p style="font-size:38px">{texts[st.session_state["index"]]}</p>', unsafe_allow_html=True)
         # Display the audio
+        if st.button("Regenerate image"):
+            with st.spinner("Regenerating image..."):
+                image_prompt = st.session_state.dict_dall_e_3_gpt["segments"][st.session_state.index]["image_prompt"]
+                segment_content = st.session_state.dict_dall_e_3_gpt["segments"][st.session_state.index]["content"]
+                i_seg = st.session_state.index
+                story_id = story_selectbox[0]
+                process_image(openai_api_key, image_prompt, i_seg, story_id, segment_id, s3_client, bucket_name=BUCKET_NAME)
         audio_path = st.session_state.dict_dall_e_3_gpt["segments"][st.session_state.index]["audio_path"]
         audio_file = AudioSegment.from_mp3(audio_path)
         audio_file.export("audio/output.wav", format="wav")
