@@ -261,10 +261,13 @@ def main():
         if st.button("Regenerate image"):
             with st.spinner("Regenerating image..."):
                 image_prompt = st.session_state.dict_dall_e_3_gpt["segments"][st.session_state.index]["image_prompt"]
-                segment_content = st.session_state.dict_dall_e_3_gpt["segments"][st.session_state.index]["content"]
                 i_seg = st.session_state.index
                 story_id = story_selectbox[0]
-                process_image(openai_api_key, image_prompt, i_seg, story_id, segment_id, s3_client, bucket_name=BUCKET_NAME)
+                segment_id = st.session_state.dict_dall_e_3_gpt["segments"][st.session_state.index]["segment_id"]
+                image_id = st.session_state.dict_dall_e_3_gpt["segments"][st.session_state.index]["image_id"]
+                process_image(openai_api_key, image_prompt, i_seg, story_id, segment_id, s3_client,
+                              bucket_name=BUCKET_NAME, replace_old_image=True,
+                              replace_image_id=image_id)
         audio_path = st.session_state.dict_dall_e_3_gpt["segments"][st.session_state.index]["audio_path"]
         audio_file = AudioSegment.from_mp3(audio_path)
         audio_file.export("audio/output.wav", format="wav")

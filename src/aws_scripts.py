@@ -82,8 +82,13 @@ def delete_s3_objects(s3_cl, bucket_name, prefix):
 
 
 def delete_single_objects_from_s3(s3_cl, bucket_name, object_name):
-    s3_cl.delete_object(Bucket=bucket_name, Key=object_name)
-    st.info(f"Deleted {object_name} from S3")
+    try:
+        s3_cl.delete_object(Bucket=bucket_name, Key=object_name)
+        st.info(f"Deleted {object_name} from S3")
+        return True
+    except Exception as e:
+        st.error(f"An error occurred: {e}")
+        return False
 
 
 def download_image(s3_cl, bucket_name, story_id, image_id, local_file_path):
@@ -284,3 +289,14 @@ def get_all_voices_for_category(category):
             voices = cursor.fetchall()
     return voices
 
+
+def delete_image_record(image_id):
+    try:
+        with connect_to_db() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    DELETE FROM images WHERE image_id = %s
+                """, (image_id,))
+                conn.commit()
+    except Exception as e:
+        print(f"An error occurred: {e}")
