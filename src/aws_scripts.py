@@ -144,7 +144,7 @@ def get_story_segments_and_image_urls(story_id):
     with connect_to_db() as conn:
         with conn.cursor() as cursor:
             cursor.execute("""
-                SELECT ss.segment_id, ss.content, i.url, i.image_id, aud.url, aud.audio_id
+                SELECT ss.segment_id, ss.content, i.url, i.image_id, aud.url, aud.audio_id, ss.image_prompt
                 FROM story_segments ss
                 LEFT JOIN images i ON ss.segment_id = i.segment_id
                 LEFT JOIN audios aud ON ss.segment_id = aud.segment_id

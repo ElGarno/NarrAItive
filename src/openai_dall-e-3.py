@@ -75,14 +75,15 @@ def main():
         # fill dict with segments
         st.session_state.dict_dall_e_3_gpt["title"] = story_selectbox[1]
         st.session_state.dict_dall_e_3_gpt["segments"] = []
-        for segment_id, content, image_url, image_id, audio_url, audio_id in segments:
+        for segment_id, content, image_url, image_id, audio_url, audio_id, image_prompt in segments:
             st.session_state.dict_dall_e_3_gpt["segments"].append({
                 "segment_id": segment_id,
                 "content": content,
                 "image_path": image_url,
                 "image_id": image_id,
                 "audio_path": audio_url,
-                "audio_id": audio_id
+                "audio_id": audio_id,
+                "image_prompt": image_prompt
             })
         for i_segment in range(len(st.session_state.dict_dall_e_3_gpt["segments"])):
             loc_file_path = f"img/output_{i_segment}.png"
@@ -206,7 +207,8 @@ def main():
                         process_image_args.append({'openai_api_key': openai_api_key, 'image_prompt': image_prompt, 'i_seg': i_seg, 'story_id': story_id, 'segment_id': segment_id, 's3_client': s3_client, 'bucket_name': BUCKET_NAME})
                     else:
                         with st.spinner("Generating image..."):
-                            process_image(openai_api_key, image_prompt, i_seg, story_id, segment_id, s3_client, bucket_name=BUCKET_NAME)
+                            process_image(openai_api_key, image_prompt, i_seg, story_id, segment_id, s3_client,
+                                          bucket_name=BUCKET_NAME)
                             api_image_costs += 0.0
                     # append image path to dict
                     st.session_state.dict_dall_e_3_gpt["segments"][i_seg]["image_path"] = f"img/output_{i_seg}.png"
@@ -260,6 +262,7 @@ def main():
         # Display the audio
         if st.button("Regenerate image"):
             with st.spinner("Regenerating image..."):
+                # st.write(st.session_state.dict_dall_e_3_gpt["segments"])
                 image_prompt = st.session_state.dict_dall_e_3_gpt["segments"][st.session_state.index]["image_prompt"]
                 i_seg = st.session_state.index
                 story_id = story_selectbox[0]

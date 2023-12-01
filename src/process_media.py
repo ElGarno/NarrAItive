@@ -7,8 +7,15 @@ import requests
 
 def process_image(openai_api_key, image_prompt, i_seg, story_id, segment_id, s3_client, bucket_name,
                   replace_old_image=False, replace_image_id=None):
-    image_url = get_image_from_prompt(api_key=openai_api_key, prompt=image_prompt)
-    # write image to local file
+    # try to generate image, if fails, try again
+    image_url = None
+    while image_url is None:
+        try:
+            image_url = get_image_from_prompt(api_key=openai_api_key, prompt=image_prompt)
+        except Exception as e:
+            print(f"Error generating image, Errormessage: {e}. Try again...")
+            pass
+        # write image to local file
     write_image_from_url_to_file(image_url, "img", f"output_{i_seg}")
     if replace_old_image:
         # delete old image from aws s3 bucket
