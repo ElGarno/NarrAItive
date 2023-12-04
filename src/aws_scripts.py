@@ -139,7 +139,7 @@ def get_stories():
     return stories
 
 
-@st.cache_data
+# @st.cache_data
 def get_story_segments_and_image_urls(story_id):
     with connect_to_db() as conn:
         with conn.cursor() as cursor:
