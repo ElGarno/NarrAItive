@@ -144,7 +144,7 @@ def get_story_segments_and_image_urls(story_id):
     with connect_to_db() as conn:
         with conn.cursor() as cursor:
             cursor.execute("""
-                SELECT ss.segment_id, ss.content, i.url, i.image_id, aud.url, aud.audio_id, ss.image_prompt
+                SELECT ss.segment_id, ss.content, i.url, i.image_id, aud.url, aud.audio_id, ss.image_prompt, aud.voice
                 FROM story_segments ss
                 LEFT JOIN images i ON ss.segment_id = i.segment_id
                 LEFT JOIN audios aud ON ss.segment_id = aud.segment_id
@@ -153,6 +153,31 @@ def get_story_segments_and_image_urls(story_id):
             """, (story_id,))
             segments = cursor.fetchall()
     return segments
+
+
+def check_voice_exists_for_story(story_id, voice_id):
+    with connect_to_db() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+            SELECT EXISTS(
+                SELECT 1 FROM audios a
+                JOIN story_segments ss ON a.segment_id = ss.segment_id
+                WHERE ss.story_id = %s AND a.voice = %s
+            )
+            """, (story_id, voice_id))
+            exists = cursor.fetchone()[0]
+    return exists
+
+
+def get_audio_id_by_segment_and_voice(segment_id, cur_voice):
+    with connect_to_db() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT audio_id FROM audios
+                WHERE segment_id = %s AND voice = %s
+            """, (segment_id, cur_voice))
+            result = cursor.fetchone()[0]
+    return result
 
 
 @st.cache_resource

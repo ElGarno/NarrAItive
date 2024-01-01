@@ -29,7 +29,7 @@ def process_image(openai_api_key, image_prompt, i_seg, story_id, segment_id, s3_
     aws_url = upload_image_to_s3(s3_client, bucket_name, f"img/output_{i_seg}.png", story_id, image_id)
     # store image metadata in postgresql
     store_image_metadata(aws_url, image_id, segment_id, "dall_e_3_gpt", "1024x1024")
-
+    return image_id
 
 
 def process_audio(api_key, segment_content, i_seg, story_id, segment_id, s3_client, bucket_name, model, voice,
@@ -48,6 +48,7 @@ def process_audio(api_key, segment_content, i_seg, story_id, segment_id, s3_clie
     aws_audio_url = upload_audio_to_s3(s3_cl=s3_client, bucket_name=bucket_name, file_path=f"audio/output_{i_seg}.mp3", story_id=story_id, audio_id=audio_id)
     # store audio metadata in postgresql
     store_audio_metadata(url=aws_audio_url, audio_id=audio_id, segment_id=segment_id, model=model, voice=voice)
+    return audio_id
 
 
 def write_image_from_url_to_file(url, file_path, image_id):

@@ -12,7 +12,8 @@ from prompt_templates import prompt_templates
 from aws_scripts import (store_story_metadata, store_segment_metadata,
                          get_stories, get_story_segments_and_image_urls, download_image,
                          download_audio, delete_s3_objects, delete_story, upload_file_to_s3, save_file_locally)
-from aws_scripts import prepare_aws_environment, get_all_voices_for_category, get_all_voice_categories, store_voice_metadata
+from aws_scripts import (prepare_aws_environment, get_all_voices_for_category, get_all_voice_categories,
+                         store_voice_metadata, check_voice_exists_for_story, get_audio_id_by_segment_and_voice)
 from story_creating_utils import check_characters, generate_dall_e_3_gpt_dict
 from process_media import process_image, process_audio, process_audio_wrapper, process_image_wrapper
 from ai_model_apis import clone_voice
@@ -86,16 +87,19 @@ def main():
         # fill dict with segments
         st.session_state.dict_dall_e_3_gpt["title"] = story_selectbox[1]
         st.session_state.dict_dall_e_3_gpt["segments"] = []
-        for segment_id, content, image_url, image_id, audio_url, audio_id, image_prompt in segments:
-            st.session_state.dict_dall_e_3_gpt["segments"].append({
-                "segment_id": segment_id,
-                "content": content,
-                "image_path": image_url,
-                "image_id": image_id,
-                "audio_path": audio_url,
-                "audio_id": audio_id,
-                "image_prompt": image_prompt
-            })
+        first_audio_voice_id = segments[0][7]
+        for segment_id, content, image_url, image_id, audio_url, audio_id, image_prompt, voice_id in segments:
+            # filter audio_id so that only the audios belonging to the first voice_id are used
+            if voice_id == first_audio_voice_id:
+                st.session_state.dict_dall_e_3_gpt["segments"].append({
+                    "segment_id": segment_id,
+                    "content": content,
+                    "image_path": image_url,
+                    "image_id": image_id,
+                    "audio_path": audio_url,
+                    "audio_id": audio_id,
+                    "image_prompt": image_prompt
+                })
         for i_segment in range(len(st.session_state.dict_dall_e_3_gpt["segments"])):
             loc_file_path = f"img/output_{i_segment}.png"
             download_image(s3_client, BUCKET_NAME, st.session_state.story_id, st.session_state.dict_dall_e_3_gpt["segments"][i_segment]["image_id"], loc_file_path)
@@ -179,6 +183,7 @@ def main():
 
                 if description_generated:
                     set_stage(4)
+                    st.session_state.story_id = story_id
                     with st.spinner("Generating story..."):
                         st.session_state.dict_dall_e_3_gpt, st.session_state.message_list = generate_dall_e_3_gpt_dict(
                             templates_prompt,
@@ -219,20 +224,22 @@ def main():
                             process_image_args.append({'openai_api_key': openai_api_key, 'image_prompt': image_prompt, 'i_seg': i_seg, 'story_id': story_id, 'segment_id': segment_id, 's3_client': s3_client, 'bucket_name': BUCKET_NAME})
                         else:
                             with st.spinner("Generating image..."):
-                                process_image(openai_api_key, image_prompt, i_seg, story_id, segment_id, s3_client,
+                                image_id = process_image(openai_api_key, image_prompt, i_seg, story_id, segment_id, s3_client,
                                               bucket_name=BUCKET_NAME)
                                 api_image_costs += 0.0
                         # append image path to dict
                         st.session_state.dict_dall_e_3_gpt["segments"][i_seg]["image_path"] = f"img/output_{i_seg}.png"
+                        st.session_state.dict_dall_e_3_gpt["segments"][i_seg]["image_id"] = image_id
                         # preparation for parallel audio generation
                         if parallel_execution:
-                            process_audio_args.append({'openai_api_key': openai_api_key, 'segment_content': segment_content, 'i_seg': i_seg, 'story_id': story_id, 'segment_id': segment_id, 's3_client': s3_client})
+                            process_audio_args.append({'elevenlabs_api_key': elevenlabs_api_key, 'segment_content': segment_content, 'i_seg': i_seg, 'story_id': story_id, 'segment_id': segment_id, 's3_client': s3_client, 'bucket_name': BUCKET_NAME, 'model': "eleven_multilingual_v2", 'voice': selected_voice})
                         else:
                             with st.spinner("Generating audio..."):
-                                process_audio(elevenlabs_api_key, segment_content, i_seg, story_id, segment_id, s3_client, bucket_name=BUCKET_NAME, model="eleven_multilingual_v2", voice=selected_voice)
+                                audio_id = process_audio(elevenlabs_api_key, segment_content, i_seg, story_id, segment_id, s3_client, bucket_name=BUCKET_NAME, model="eleven_multilingual_v2", voice=selected_voice)
                                 api_audio_costs += 0.0
                         # append audio path to dict
                         st.session_state.dict_dall_e_3_gpt["segments"][i_seg]["audio_path"] = f"audio/output_{i_seg}.mp3"
+                        st.session_state.dict_dall_e_3_gpt["segments"][i_seg]["audio_id"] = audio_id
                     if not parallel_execution:
                         my_progress_bar.progress(1.0, text="Done!")
                         st.success("Images and audio successfully generated!")
@@ -258,6 +265,51 @@ def main():
     if st.session_state.stage > 4:
         # get number of segments
         number_segments = len(st.session_state.dict_dall_e_3_gpt["segments"])
+
+        # change voice for current story:
+        # first select one of the cloned voices
+        # then check if voice_id with selected_voice exists for story_id
+        # if yes, get the corresponding audio_id for the voice_id and segment_id, load the audio from aws s3 bucket
+        # and store it locally in f"audio/output_{i_segment}.mp3"
+        # if no, generate the audio, upload to s3, add the audio_id for every segment to the dict and store it locally
+        # in f"audio/output_{i_segment}.mp3"
+
+        # selectbox to select cloned voices
+        voices = get_all_voices_for_category("cloned")
+        selected_voice = st.selectbox("Read story with other voice?", voices, format_func=voice_format_for_selectbox,
+                                      index=None, placeholder="Select other voice...")
+        apply_voice_button = st.button("Apply voice", on_click=set_stage, args=(5,))
+        if apply_voice_button:
+            selected_voice = selected_voice[0]
+            if not openai_api_key.startswith('sk-'):
+                st.warning('Please enter your OpenAI API key!', icon='⚠')
+            else:
+                st.success('API key is valid ✅')
+                elevenlabs_api_key = os.getenv("ELEVENLABS_API_KEY")
+                progress_text = f"Generating / loading new audios for picture-book. Please wait..."
+                my_progress_bar = st.progress(0, text=progress_text)
+                story_id = st.session_state.story_id
+                # print(selected_voice, story_id)
+                if check_voice_exists_for_story(story_id, selected_voice):
+                    st.write("Voice already exists for this story!")
+                    for i_seg in range(number_segments):
+                        segment_id = st.session_state.dict_dall_e_3_gpt["segments"][i_seg]["segment_id"]
+                        my_progress_bar.progress(i_seg / (number_segments-1), text=progress_text)
+                        # just load the audio from aws s3 bucket
+                        loc_file_path_audio = f"audio/output_{i_seg}.mp3"
+                        loaded_audio_id = get_audio_id_by_segment_and_voice(segment_id, selected_voice)
+                        download_audio(s3_client, BUCKET_NAME, story_selectbox[0], loaded_audio_id, loc_file_path_audio)
+                    # delete progress bar
+                    my_progress_bar.empty()
+                else:
+                    for i_seg in range(number_segments):
+                        my_progress_bar.progress(i_seg / (number_segments-1), text=progress_text)
+                        segment_content = st.session_state.dict_dall_e_3_gpt["segments"][i_seg]["content"]
+                        # get segment_id
+                        segment_id = st.session_state.dict_dall_e_3_gpt["segments"][i_seg]["segment_id"]
+
+                        with st.spinner("Generating audio..."):
+                            st.session_state.dict_dall_e_3_gpt["segments"][i_seg]["audio_id"] = process_audio(elevenlabs_api_key, segment_content, i_seg, story_id, segment_id, s3_client, bucket_name=BUCKET_NAME, model="eleven_multilingual_v2", voice=selected_voice)
 
 
         # set index = 0 only for the first run
@@ -289,13 +341,14 @@ def main():
                 story_id = story_selectbox[0]
                 segment_id = st.session_state.dict_dall_e_3_gpt["segments"][st.session_state.index]["segment_id"]
                 image_id = st.session_state.dict_dall_e_3_gpt["segments"][st.session_state.index]["image_id"]
-                process_image(openai_api_key, image_prompt, i_seg, story_id, segment_id, s3_client,
+                st.session_state.dict_dall_e_3_gpt["segments"][i_seg]["image_id"] = process_image(openai_api_key, image_prompt, i_seg, story_id, segment_id, s3_client,
                               bucket_name=BUCKET_NAME, replace_old_image=True,
                               replace_image_id=image_id)
         audio_path = st.session_state.dict_dall_e_3_gpt["segments"][st.session_state.index]["audio_path"]
         audio_file = AudioSegment.from_mp3(audio_path)
         audio_file.export("audio/output.wav", format="wav")
         st.audio("audio/output.wav", format="audio/wav")
+
 
 if __name__ == "__main__":
     main()
