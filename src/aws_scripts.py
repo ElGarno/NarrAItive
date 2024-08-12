@@ -115,7 +115,7 @@ def save_avatar_img_locally(file_path, uploaded_file):
 
 
 def delete_story(story_id):
-    with connect_to_db() as conn:
+    with connect_to_duckdb() as conn:
         with conn.cursor() as cursor:
             try:
                 # Just delete the story, and cascading will take care of the rest
@@ -132,7 +132,7 @@ def delete_story(story_id):
 
 
 def get_stories():
-    with connect_to_db() as conn:
+    with connect_to_duckdb() as conn:
         with conn.cursor() as cursor:
             cursor.execute(
                 "SELECT story_id, title FROM story ORDER BY creation_timestamp DESC")
@@ -142,7 +142,7 @@ def get_stories():
 
 # @st.cache_data
 def get_story_segments_and_image_urls(story_id):
-    with connect_to_db() as conn:
+    with connect_to_duckdb() as conn:
         with conn.cursor() as cursor:
             cursor.execute("""
                 SELECT ss.segment_id, ss.content, i.url, i.image_id, aud.url, aud.audio_id, ss.image_prompt, aud.voice
@@ -157,7 +157,7 @@ def get_story_segments_and_image_urls(story_id):
 
 
 def check_voice_exists_for_story(story_id, voice_id):
-    with connect_to_db() as conn:
+    with connect_to_duckdb() as conn:
         with conn.cursor() as cursor:
             cursor.execute("""
             SELECT EXISTS(
@@ -171,7 +171,7 @@ def check_voice_exists_for_story(story_id, voice_id):
 
 
 def get_audio_id_by_segment_and_voice(segment_id, cur_voice):
-    with connect_to_db() as conn:
+    with connect_to_duckdb() as conn:
         with conn.cursor() as cursor:
             cursor.execute("""
                 SELECT audio_id FROM audios
@@ -199,7 +199,7 @@ def connect_to_duckdb():
 
 def store_image_metadata(url, image_id, segment_id, model, resolution):
     creation_time = datetime.now()
-    with connect_to_db() as conn:
+    with connect_to_duckdb() as conn:
         with conn.cursor() as cursor:
             cursor.execute("""
                 INSERT INTO images (image_id, segment_id, url, creation_timestamp, creation_model, resolution) 
@@ -209,7 +209,7 @@ def store_image_metadata(url, image_id, segment_id, model, resolution):
 
 
 def store_segment_metadata(story_id, segment_id, segment_pos, content, image_prompt):
-    with connect_to_db() as conn:
+    with connect_to_duckdb() as conn:
         with conn.cursor() as cursor:
             cursor.execute("""
                 INSERT INTO story_segments (story_id, segment_id, segment_pos, content, image_prompt) 
@@ -220,7 +220,7 @@ def store_segment_metadata(story_id, segment_id, segment_pos, content, image_pro
 
 def store_story_metadata(story_id, num_segments, title, age, llm):
     creation_time = datetime.now()
-    with connect_to_db() as conn:
+    with connect_to_duckdb() as conn:
         with conn.cursor() as cursor:
             cursor.execute("""
                 INSERT INTO story (story_id, num_segments, title, age, llm, creation_timestamp) 
@@ -231,7 +231,7 @@ def store_story_metadata(story_id, num_segments, title, age, llm):
 
 def store_audio_metadata(url, audio_id, segment_id, model, voice):
     creation_time = datetime.now()
-    with connect_to_db() as conn:
+    with connect_to_duckdb() as conn:
         with conn.cursor() as cursor:
             cursor.execute("""
                 INSERT INTO audios (audio_id, segment_id, url, creation_timestamp, creation_model, voice) 
@@ -242,7 +242,7 @@ def store_audio_metadata(url, audio_id, segment_id, model, voice):
 
 def store_voice_metadata(name, voice_id, category, training_files, labels):
     creation_time = datetime.now()
-    with connect_to_db() as conn:
+    with connect_to_duckdb() as conn:
         with conn.cursor() as cursor:
             cursor.execute("""
                 INSERT INTO voices (name, voice_id, category, training_files, labels, creation_datetime) 
@@ -252,7 +252,7 @@ def store_voice_metadata(name, voice_id, category, training_files, labels):
 
 
 def get_voice_id_by_voice_name(voice_name):
-    with connect_to_db() as conn:
+    with connect_to_duckdb() as conn:
         with conn.cursor() as cursor:
             cursor.execute("""
                 SELECT voice_id FROM voices WHERE name = %s
@@ -262,7 +262,7 @@ def get_voice_id_by_voice_name(voice_name):
 
 
 def get_all_voice_categories():
-    with connect_to_db() as conn:
+    with connect_to_duckdb() as conn:
         with conn.cursor() as cursor:
             cursor.execute("""
                 SELECT DISTINCT category FROM voices
@@ -272,7 +272,7 @@ def get_all_voice_categories():
 
 
 def get_all_accents_from_labels():
-    with connect_to_db() as conn:
+    with connect_to_duckdb() as conn:
         with conn.cursor() as cursor:
             cursor.execute("""
                 SELECT DISTINCT labels->>'accent' FROM voices
@@ -282,7 +282,7 @@ def get_all_accents_from_labels():
 
 
 def get_all_ages_from_labels():
-    with connect_to_db() as conn:
+    with connect_to_duckdb() as conn:
         with conn.cursor() as cursor:
             cursor.execute("""
                 SELECT DISTINCT labels->>'age' FROM voices
@@ -292,7 +292,7 @@ def get_all_ages_from_labels():
 
 
 def get_all_genders_from_labels():
-    with connect_to_db() as conn:
+    with connect_to_duckdb() as conn:
         with conn.cursor() as cursor:
             cursor.execute("""
                 SELECT DISTINCT labels->>'gender' FROM voices
@@ -302,7 +302,7 @@ def get_all_genders_from_labels():
 
 
 def get_all_use_cases_from_labels():
-    with connect_to_db() as conn:
+    with connect_to_duckdb() as conn:
         with conn.cursor() as cursor:
             cursor.execute("""
                 SELECT DISTINCT labels->>'use_case' FROM voices
@@ -312,7 +312,7 @@ def get_all_use_cases_from_labels():
 
 
 def get_all_voices_for_category(category):
-    with connect_to_db() as conn:
+    with connect_to_duckdb() as conn:
         with conn.cursor() as cursor:
             cursor.execute("""
                 SELECT voice_id, name, labels FROM voices WHERE category = %s
@@ -323,7 +323,7 @@ def get_all_voices_for_category(category):
 
 def delete_image_record(image_id):
     try:
-        with connect_to_db() as conn:
+        with connect_to_duckdb() as conn:
             with conn.cursor() as cursor:
                 cursor.execute("""
                     DELETE FROM images WHERE image_id = %s
