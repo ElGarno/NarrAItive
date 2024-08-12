@@ -1,8 +1,7 @@
 import requests
 import base64
 import openai
-from elevenlabs import clone
-from elevenlabs import set_api_key
+from elevenlabs.client import ElevenLabs
 from aws_scripts import get_voice_id_by_voice_name
 
 CHUNK_SIZE = 1024
@@ -58,7 +57,7 @@ def encode_image(image_path):
 
 def get_description_from_image(api_key,
                                image_url,
-                               model="gpt-4-vision-preview"):
+                               model="gpt-4o-mini"):
     # Path to your image
     image_path = image_url
 
@@ -107,13 +106,8 @@ def clone_voice(api_key, files, name, description="", labels=None):
     """
     if labels is None:
         labels = {}
-    set_api_key(api_key)
-    voice = clone(
-        name=name,
-        files=files,
-        description=description,
-        labels=labels
-    )
+    client = ElevenLabs(api_key=api_key)
+    voice = client.voices.add(name=name, files=files, description=description, labels=labels)
     return voice
 
 
@@ -157,7 +151,7 @@ def generate_audio_voice_id(api_key, voice_id, text, file_path, model_id="eleven
 
 
 def get_voices(api_key):
-    set_api_key(api_key)
+    client = ElevenLabs(api_key=api_key)
     url = "https://api.elevenlabs.io/v1/voices"
     response = requests.request("GET", url)
     return response.json()

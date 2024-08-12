@@ -120,10 +120,10 @@ def delete_story(story_id):
             try:
                 # Just delete the story, and cascading will take care of the rest
                 # Delete operations
-                cursor.execute("DELETE FROM audios WHERE segment_id IN (SELECT segment_id FROM story_segments WHERE story_id = %s)", (story_id,))
-                cursor.execute("DELETE FROM images WHERE segment_id IN (SELECT segment_id FROM story_segments WHERE story_id = %s)", (story_id,))
-                cursor.execute("DELETE FROM story_segments WHERE story_id = %s", (story_id,))
-                cursor.execute("DELETE FROM story WHERE story_id = %s", (story_id,))
+                cursor.execute("DELETE FROM audios WHERE segment_id IN (SELECT segment_id FROM story_segments WHERE story_id = ?)", (story_id,))
+                cursor.execute("DELETE FROM images WHERE segment_id IN (SELECT segment_id FROM story_segments WHERE story_id = ?)", (story_id,))
+                cursor.execute("DELETE FROM story_segments WHERE story_id = ?", (story_id,))
+                cursor.execute("DELETE FROM story WHERE story_id = ?", (story_id,))
                 # Commit the transaction
                 conn.commit()
             except Exception as e:
@@ -149,7 +149,7 @@ def get_story_segments_and_image_urls(story_id):
                 FROM story_segments ss
                 LEFT JOIN images i ON ss.segment_id = i.segment_id
                 LEFT JOIN audios aud ON ss.segment_id = aud.segment_id
-                WHERE ss.story_id = %s
+                WHERE ss.story_id = ?
                 ORDER BY ss.segment_pos
             """, (story_id,))
             segments = cursor.fetchall()
@@ -163,7 +163,7 @@ def check_voice_exists_for_story(story_id, voice_id):
             SELECT EXISTS(
                 SELECT 1 FROM audios a
                 JOIN story_segments ss ON a.segment_id = ss.segment_id
-                WHERE ss.story_id = %s AND a.voice = %s
+                WHERE ss.story_id = ? AND a.voice = ?
             )
             """, (story_id, voice_id))
             exists = cursor.fetchone()[0]
@@ -175,7 +175,7 @@ def get_audio_id_by_segment_and_voice(segment_id, cur_voice):
         with conn.cursor() as cursor:
             cursor.execute("""
                 SELECT audio_id FROM audios
-                WHERE segment_id = %s AND voice = %s
+                WHERE segment_id = ? AND voice = ?
             """, (segment_id, cur_voice))
             result = cursor.fetchone()[0]
     return result
@@ -192,7 +192,6 @@ def connect_to_db():
     )
 
 
-@st.cache_data
 def connect_to_duckdb():
     return duckdb.connect('narrAItive_duckDB.duckdb')
 
@@ -203,7 +202,7 @@ def store_image_metadata(url, image_id, segment_id, model, resolution):
         with conn.cursor() as cursor:
             cursor.execute("""
                 INSERT INTO images (image_id, segment_id, url, creation_timestamp, creation_model, resolution) 
-                VALUES (%s, %s, %s, %s, %s, %s)
+                VALUES (?, ?, ?, ?, ?, ?)
             """, (image_id, segment_id, url, creation_time, model, resolution))
             conn.commit()
 
@@ -213,7 +212,7 @@ def store_segment_metadata(story_id, segment_id, segment_pos, content, image_pro
         with conn.cursor() as cursor:
             cursor.execute("""
                 INSERT INTO story_segments (story_id, segment_id, segment_pos, content, image_prompt) 
-                VALUES (%s, %s, %s, %s, %s)
+                VALUES (?, ?, ?, ?, ?)
             """, (story_id, segment_id, segment_pos, content, image_prompt))
             conn.commit()
 
@@ -224,7 +223,7 @@ def store_story_metadata(story_id, num_segments, title, age, llm):
         with conn.cursor() as cursor:
             cursor.execute("""
                 INSERT INTO story (story_id, num_segments, title, age, llm, creation_timestamp) 
-                VALUES (%s, %s, %s, %s, %s, %s)
+                VALUES (?, ?, ?, ?, ?, ?)
             """, (story_id, num_segments, title, age, llm, creation_time))
             conn.commit()
 
@@ -235,7 +234,7 @@ def store_audio_metadata(url, audio_id, segment_id, model, voice):
         with conn.cursor() as cursor:
             cursor.execute("""
                 INSERT INTO audios (audio_id, segment_id, url, creation_timestamp, creation_model, voice) 
-                VALUES (%s, %s, %s, %s, %s, %s)
+                VALUES (?, ?, ?, ?, ?, ?)
             """, (audio_id, segment_id, url, creation_time, model, voice))
             conn.commit()
 
@@ -246,7 +245,7 @@ def store_voice_metadata(name, voice_id, category, training_files, labels):
         with conn.cursor() as cursor:
             cursor.execute("""
                 INSERT INTO voices (name, voice_id, category, training_files, labels, creation_datetime) 
-                VALUES (%s, %s, %s, %s, %s, %s)
+                VALUES (?, ?, ?, ?, ?, ?)
             """, (name, voice_id, category, training_files, json.dumps(labels), creation_time))
             conn.commit()
 
@@ -255,7 +254,7 @@ def get_voice_id_by_voice_name(voice_name):
     with connect_to_duckdb() as conn:
         with conn.cursor() as cursor:
             cursor.execute("""
-                SELECT voice_id FROM voices WHERE name = %s
+                SELECT voice_id FROM voices WHERE name = ?
             """, (voice_name,))
             voice_id = cursor.fetchone()[0]
     return voice_id
@@ -315,7 +314,7 @@ def get_all_voices_for_category(category):
     with connect_to_duckdb() as conn:
         with conn.cursor() as cursor:
             cursor.execute("""
-                SELECT voice_id, name, labels FROM voices WHERE category = %s
+                SELECT voice_id, name, labels FROM voices WHERE category = ?
             """, (category,))
             voices = cursor.fetchall()
     return voices
@@ -326,7 +325,7 @@ def delete_image_record(image_id):
         with connect_to_duckdb() as conn:
             with conn.cursor() as cursor:
                 cursor.execute("""
-                    DELETE FROM images WHERE image_id = %s
+                    DELETE FROM images WHERE image_id = ?
                 """, (image_id,))
                 conn.commit()
     except Exception as e:
