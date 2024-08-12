@@ -3,6 +3,7 @@ from datetime import datetime
 from creds_db import DBConfig
 from creds_aws import AWSConfig
 import streamlit as st
+import duckdb
 import boto3
 import json
 import os
@@ -189,6 +190,11 @@ def connect_to_db():
         host=DBConfig.DB_HOST,
         port=DBConfig.DB_PORT
     )
+
+
+@st.cache_data
+def connect_to_duckdb():
+    return duckdb.connect('narrAItive_duckDB.duckdb')
 
 
 def store_image_metadata(url, image_id, segment_id, model, resolution):
