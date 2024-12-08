@@ -8,6 +8,35 @@ import boto3
 import json
 import os
 
+# Add at top with other constants
+REGION = "eu-central-1"
+DB_PATH = 'narrAItive_duckDB.duckdb'
+
+# Global connection pool
+_db_connection = None
+
+def get_db_connection():
+    """Get or create database connection"""
+    global _db_connection
+    if (_db_connection is None):
+        _db_connection = duckdb.connect(DB_PATH)
+    return _db_connection
+
+def close_db_connection():
+    """Close the database connection"""
+    global _db_connection
+    if _db_connection:
+        _db_connection.close()
+        _db_connection = None
+
+def execute_query(query, params=None, fetch=True):
+    """Execute a query and optionally fetch results"""
+    conn = get_db_connection()
+    with conn.cursor() as cursor:
+        cursor.execute(query, params or ())
+        if fetch:
+            return cursor.fetchall()
+        conn.commit()
 
 REGION = "eu-central-1"
 
@@ -115,70 +144,57 @@ def save_avatar_img_locally(file_path, uploaded_file):
 
 
 def delete_story(story_id):
-    with connect_to_duckdb() as conn:
+    try:
+        queries = [
+            "DELETE FROM audios WHERE segment_id IN (SELECT segment_id FROM story_segments WHERE story_id = ?)",
+            "DELETE FROM images WHERE segment_id IN (SELECT segment_id FROM story_segments WHERE story_id = ?)",
+            "DELETE FROM story_segments WHERE story_id = ?",
+            "DELETE FROM story WHERE story_id = ?"
+        ]
+        
+        conn = get_db_connection()
         with conn.cursor() as cursor:
-            try:
-                # Just delete the story, and cascading will take care of the rest
-                # Delete operations
-                cursor.execute("DELETE FROM audios WHERE segment_id IN (SELECT segment_id FROM story_segments WHERE story_id = ?)", (story_id,))
-                cursor.execute("DELETE FROM images WHERE segment_id IN (SELECT segment_id FROM story_segments WHERE story_id = ?)", (story_id,))
-                cursor.execute("DELETE FROM story_segments WHERE story_id = ?", (story_id,))
-                cursor.execute("DELETE FROM story WHERE story_id = ?", (story_id,))
-                # Commit the transaction
-                conn.commit()
-            except Exception as e:
-                print(f"An error occurred: {e}")
-                conn.rollback()  # Rollback in case of any error
+            for query in queries:
+                cursor.execute(query, (story_id,))
+            conn.commit()
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        conn.rollback()
 
 
 def get_stories():
-    with connect_to_duckdb() as conn:
-        with conn.cursor() as cursor:
-            cursor.execute(
-                "SELECT story_id, title FROM story ORDER BY creation_timestamp DESC")
-            stories = cursor.fetchall()
-    return stories
+    return execute_query("SELECT story_id, title FROM story ORDER BY creation_timestamp DESC")
 
 
 # @st.cache_data
 def get_story_segments_and_image_urls(story_id):
-    with connect_to_duckdb() as conn:
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                SELECT ss.segment_id, ss.content, i.url, i.image_id, aud.url, aud.audio_id, ss.image_prompt, aud.voice
-                FROM story_segments ss
-                LEFT JOIN images i ON ss.segment_id = i.segment_id
-                LEFT JOIN audios aud ON ss.segment_id = aud.segment_id
-                WHERE ss.story_id = ?
-                ORDER BY ss.segment_pos
-            """, (story_id,))
-            segments = cursor.fetchall()
-    return segments
+    return execute_query("""
+        SELECT ss.segment_id, ss.content, i.url, i.image_id, aud.url, aud.audio_id, ss.image_prompt, aud.voice
+        FROM story_segments ss
+        LEFT JOIN images i ON ss.segment_id = i.segment_id
+        LEFT JOIN audios aud ON ss.segment_id = aud.segment_id
+        WHERE ss.story_id = ?
+        ORDER BY ss.segment_pos
+    """, (story_id,))
 
 
 def check_voice_exists_for_story(story_id, voice_id):
-    with connect_to_duckdb() as conn:
-        with conn.cursor() as cursor:
-            cursor.execute("""
-            SELECT EXISTS(
-                SELECT 1 FROM audios a
-                JOIN story_segments ss ON a.segment_id = ss.segment_id
-                WHERE ss.story_id = ? AND a.voice = ?
-            )
-            """, (story_id, voice_id))
-            exists = cursor.fetchone()[0]
-    return exists
+    result = execute_query("""
+        SELECT EXISTS(
+            SELECT 1 FROM audios a
+            JOIN story_segments ss ON a.segment_id = ss.segment_id
+            WHERE ss.story_id = ? AND a.voice = ?
+        )
+    """, (story_id, voice_id))
+    return result[0][0]
 
 
 def get_audio_id_by_segment_and_voice(segment_id, cur_voice):
-    with connect_to_duckdb() as conn:
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                SELECT audio_id FROM audios
-                WHERE segment_id = ? AND voice = ?
-            """, (segment_id, cur_voice))
-            result = cursor.fetchone()[0]
-    return result
+    result = execute_query("""
+        SELECT audio_id FROM audios
+        WHERE segment_id = ? AND voice = ?
+    """, (segment_id, cur_voice))
+    return result[0][0]
 
 
 @st.cache_resource
@@ -198,135 +214,106 @@ def connect_to_duckdb():
 
 def store_image_metadata(url, image_id, segment_id, model, resolution):
     creation_time = datetime.now()
-    with connect_to_duckdb() as conn:
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                INSERT INTO images (image_id, segment_id, url, creation_timestamp, creation_model, resolution) 
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (image_id, segment_id, url, creation_time, model, resolution))
-            conn.commit()
+    execute_query(
+        """INSERT INTO images (image_id, segment_id, url, creation_timestamp, creation_model, resolution) 
+           VALUES (?, ?, ?, ?, ?, ?)""",
+        (image_id, segment_id, url, creation_time, model, resolution),
+        fetch=False
+    )
 
 
 def store_segment_metadata(story_id, segment_id, segment_pos, content, image_prompt):
-    with connect_to_duckdb() as conn:
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                INSERT INTO story_segments (story_id, segment_id, segment_pos, content, image_prompt) 
-                VALUES (?, ?, ?, ?, ?)
-            """, (story_id, segment_id, segment_pos, content, image_prompt))
-            conn.commit()
+    execute_query(
+        """INSERT INTO story_segments (story_id, segment_id, segment_pos, content, image_prompt) 
+           VALUES (?, ?, ?, ?, ?)""",
+        (story_id, segment_id, segment_pos, content, image_prompt),
+        fetch=False
+    )
 
 
 def store_story_metadata(story_id, num_segments, title, age, llm):
     creation_time = datetime.now()
-    with connect_to_duckdb() as conn:
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                INSERT INTO story (story_id, num_segments, title, age, llm, creation_timestamp) 
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (story_id, num_segments, title, age, llm, creation_time))
-            conn.commit()
+    execute_query(
+        """INSERT INTO story (story_id, num_segments, title, age, llm, creation_timestamp) 
+           VALUES (?, ?, ?, ?, ?, ?)""",
+        (story_id, num_segments, title, age, llm, creation_time),
+        fetch=False
+    )
 
 
 def store_audio_metadata(url, audio_id, segment_id, model, voice):
     creation_time = datetime.now()
-    with connect_to_duckdb() as conn:
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                INSERT INTO audios (audio_id, segment_id, url, creation_timestamp, creation_model, voice) 
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (audio_id, segment_id, url, creation_time, model, voice))
-            conn.commit()
+    execute_query(
+        """INSERT INTO audios (audio_id, segment_id, url, creation_timestamp, creation_model, voice) 
+           VALUES (?, ?, ?, ?, ?, ?)""",
+        (audio_id, segment_id, url, creation_time, model, voice),
+        fetch=False
+    )
 
 
 def store_voice_metadata(name, voice_id, category, training_files, labels):
     creation_time = datetime.now()
-    with connect_to_duckdb() as conn:
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                INSERT INTO voices (name, voice_id, category, training_files, labels, creation_datetime) 
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (name, voice_id, category, training_files, json.dumps(labels), creation_time))
-            conn.commit()
+    execute_query(
+        """INSERT INTO voices (name, voice_id, category, training_files, labels, creation_datetime) 
+           VALUES (?, ?, ?, ?, ?, ?)""",
+        (name, voice_id, category, training_files, json.dumps(labels), creation_time),
+        fetch=False
+    )
 
 
 def get_voice_id_by_voice_name(voice_name):
-    with connect_to_duckdb() as conn:
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                SELECT voice_id FROM voices WHERE name = ?
-            """, (voice_name,))
-            voice_id = cursor.fetchone()[0]
-    return voice_id
+    result = execute_query("""
+        SELECT voice_id FROM voices WHERE name = ?
+    """, (voice_name,))
+    return result[0][0]
 
 
 def get_all_voice_categories():
-    with connect_to_duckdb() as conn:
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                SELECT DISTINCT category FROM voices
-            """)
-            categories = [row[0] for row in cursor.fetchall()]
-    return categories
+    result = execute_query("""
+        SELECT DISTINCT category FROM voices
+    """)
+    return [row[0] for row in result]
 
 
 def get_all_accents_from_labels():
-    with connect_to_duckdb() as conn:
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                SELECT DISTINCT labels->>'accent' FROM voices
-            """)
-            accents = cursor.fetchall()
-    return accents
+    return execute_query("""
+        SELECT DISTINCT labels->>'accent' FROM voices
+    """)
 
 
 def get_all_ages_from_labels():
-    with connect_to_duckdb() as conn:
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                SELECT DISTINCT labels->>'age' FROM voices
-            """)
-            ages = cursor.fetchall()
-    return ages
+    return execute_query("""
+        SELECT DISTINCT labels->>'age' FROM voices
+    """)
 
 
 def get_all_genders_from_labels():
-    with connect_to_duckdb() as conn:
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                SELECT DISTINCT labels->>'gender' FROM voices
-            """)
-            genders = cursor.fetchall()
-    return genders
+    return execute_query("""
+        SELECT DISTINCT labels->>'gender' FROM voices
+    """)
 
 
 def get_all_use_cases_from_labels():
-    with connect_to_duckdb() as conn:
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                SELECT DISTINCT labels->>'use_case' FROM voices
-            """)
-            use_cases = cursor.fetchall()
-    return use_cases
+    return execute_query("""
+        SELECT DISTINCT labels->>'use_case' FROM voices
+    """)
 
 
 def get_all_voices_for_category(category):
-    with connect_to_duckdb() as conn:
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                SELECT voice_id, name, labels FROM voices WHERE category = ?
-            """, (category,))
-            voices = cursor.fetchall()
-    return voices
+    return execute_query("""
+        SELECT voice_id, name, labels FROM voices WHERE category = ?
+    """, (category,))
 
 
 def delete_image_record(image_id):
     try:
-        with connect_to_duckdb() as conn:
-            with conn.cursor() as cursor:
-                cursor.execute("""
-                    DELETE FROM images WHERE image_id = ?
-                """, (image_id,))
-                conn.commit()
+        execute_query("""
+            DELETE FROM images WHERE image_id = ?
+        """, (image_id,), fetch=False)
     except Exception as e:
         print(f"An error occurred: {e}")
+
+
+# Add cleanup function to be called when application shuts down
+def cleanup():
+    close_db_connection()
