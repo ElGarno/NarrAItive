@@ -2,22 +2,24 @@
 name = "narraitive"
 version = "0.1.0"
 description = ""
-authors = ["Faffi"]
+authors = ["Fabian Wörenkämper <f.woerenkaemper@krombacher.de>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.12"
-psycopg2-binary = "^2.9.9"
-duckdb = "^1.0.0"
-pandas = "^2.2.2"
-python-dotenv = "^1.0.1"
-openai = "^1.40.2"
+python = "^3.13"
 elevenlabs = "^1.13.3"
+psycopg2-binary = "^2.9.10"
+duckdb = "^1.1.3"
+pandas = "^2.2.3"
+python-dotenv = "^1.0.1"
+openai = "^1.57.0"
 requests = "^2.32.3"
-boto3 = "^1.34.157"
-streamlit = "^1.37.1"
-jupyter = "^1.0.0"
+boto3 = "^1.35.76"
+streamlit = "^1.40.2"
+jupyter = "^1.1.1"
 pydub = "^0.25.1"
+ipython = "^8.30.0"
+streamlit-chat = "^0.1.1"
 
 
 [build-system]
